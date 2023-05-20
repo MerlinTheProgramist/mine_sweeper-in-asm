@@ -1,8 +1,3 @@
-section .text
-global _start
-
-
-%include "print.asm"
 
 ; retrun CPU time to RAX
 %macro get_rdtsc 0 
@@ -12,11 +7,12 @@ global _start
 %endmacro
 
 ; Divident is RAX
-; return is RDX
+; return is RAX
 %macro modul 1
 	xor 	rdx, rdx
 	mov 	rbx, %1
 	div 	rbx ; RAX=Quotient, RDX=Reminder
+	mov 	rax, rdx
 %endmacro
 
 ; linear Congruation Generator 
@@ -24,7 +20,7 @@ global _start
 ; values are from wikipedia
 %define M 	1<<32
 %define A 	1664525
-%define C 	16645223
+%define C 	1013904223
 ; seed in RAX 
 ; return seed in RAX
 nextRand:
@@ -40,24 +36,3 @@ nextRand:
 	pop rdx
 	pop rbx
 	ret
-
-_start:	
-
-	get_rdtsc
-
-	mov 	rcx, 100 ; i=0
-	_for:
-	push 	rcx
-	
-	call nextRand
-    call print_num ; number already in rax
-
-    call print_endl
-
-	pop rcx
-	dec 	rcx
-	test 	rcx, rcx
-	jnz _for
-	mov 	rax, 60 ; sys_exit
-	mov     rdi, 0 ; exit code
-	syscall

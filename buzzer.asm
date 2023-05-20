@@ -14,8 +14,8 @@ global _start				; symbol globalny dla linkera LD
 
 custom_pause:	; pause for CX:DX ms
 	push 	rbx
-	push 	rcx
-	push 	rdx
+	push 	rsi
+	push 	rdi
 
 	mov 	ax, cx
 	shl		eax, 16
@@ -30,8 +30,8 @@ custom_pause:	; pause for CX:DX ms
 	mov 	rsi, t2
 	syscall
 
-	pop 	rdx
-	pop 	rcx
+	pop 	rdi
+	pop 	rsi
 	pop 	rbx
 	ret
 
@@ -39,7 +39,7 @@ _start:
 mov 	rax, 2 ; sys_open
 mov 	rdi, console
 mov 	rsi, 777o
-mov 	rdx, 1 ; O_WRONLY
+mov 	rdi, 1 ; O_WRONLY
 syscall
 cmp		rax, 0 ; if errors
 jg	_opened
@@ -50,11 +50,11 @@ _opened:
 mov 	rdi, rax 		; RBX = file descriptor
 mov 	rax, sys_ioctl	; 
 mov 	rsi, KIOCSOUND	; 
-xor		rdx, rdx		; no arguments
+xor		rdi, rdi		; no arguments
 syscall 
 
 mov 	rax, sys_ioctl
-mov 	rdx, 2711	; 2711 = 1234DDh/440. 440Hz => A note
+mov 	rdi, 2711	; 2711 = 1234DDh/440. 440Hz => A note
 syscall
 
 mov 	cx, 0fh

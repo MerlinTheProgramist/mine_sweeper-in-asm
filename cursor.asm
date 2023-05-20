@@ -2,9 +2,6 @@
 section .text
 global _start
 
-
-_start:
-
 %macro sys_exit 0
 	mov 	rax, 60 ; sys_exit
 	mov     rdi, 0 ; exit code
@@ -15,10 +12,11 @@ _start:
     mov 	rax, 1		    ; sys_write
     mov     rdi, 1			; std_out
     mov 	rsi, %1         ; char*
-    mov 	rdx, 1        	; size
+    mov 	rdi, 1        	; size
     syscall
 %endmacro
 
+_start:
 mov     r8w, WORD[cursor_pos+pos.y]
 _y:
 test    r8w,r8w
@@ -27,7 +25,7 @@ jz      _y_exit
 	mov 	rax, 1		    ; sys_write
 	mov     rdi, 1			; std_out
 	mov 	rsi, whiteLine	; char*
-	mov 	rdx, width  	; size
+	mov 	rdi, width  	; size
     syscall
 
 dec     r8w
@@ -42,7 +40,7 @@ jz      _x_exit
 	mov 	rax, 1		    ; sys_write
 	mov     rdi, 1			; std_out
 	mov 	rsi, whiteChar	; char*
-	mov 	rdx, 1  	; size
+	mov 	rdi, 1  	; size
     syscall
 
 dec     WORD[rsp]
@@ -60,7 +58,7 @@ jz      _2x_exit
 	mov 	rax, 1		    ; sys_write
 	mov     rdi, 1			; std_out
 	mov 	rsi, whiteChar	; char*
-	mov 	rdx, 1  	; size
+	mov 	rdi, 1  	; size
     syscall
 
 dec     WORD[rsp]
@@ -90,9 +88,10 @@ endl: db 0ah
 whiteLine: times 10 db ' ', 0ah
 width equ $ - whiteLine
 
-
-
 cursor_pos: istruc pos
     at pos.y, dw 20
     at pos.x, dw 30
 iend
+
+section .bss
+input_buffer: resd 1

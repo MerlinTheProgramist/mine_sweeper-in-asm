@@ -7,7 +7,7 @@ _start:
 	mov 	rax, 1		    ; sys_write
 	mov     rdi, 1			; std_out
 	mov 	rsi, tekst		; char*
-	mov 	rdx, dlugosc	; size
+	mov 	rdi, dlugosc	; size
 	syscall		
 
 section .data 				; poczatek sekcji danych
