@@ -1,4 +1,7 @@
+global nextRand
 
+
+section .text
 ; retrun CPU time to RAX
 %macro get_rdtsc 0 
     rdtsc ; edx:eax

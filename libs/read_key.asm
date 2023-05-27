@@ -1,7 +1,10 @@
+global sys_read
+global enable_key_read
+global disable_key_read
+
+exteral nextRand
 
 section .text
-global _start
-
 ; sys_read can be used alone to read char after new line from tty
 ;
 ; enable_key_read modifies ICANON for terminal interface, 
