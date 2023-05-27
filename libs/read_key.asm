@@ -2,8 +2,6 @@ global sys_read
 global enable_key_read
 global disable_key_read
 
-exteral nextRand
-
 section .text
 ; sys_read can be used alone to read char after new line from tty
 ;
@@ -47,8 +45,20 @@ enable_key_read:
 	mov  esi, 0x5401         ; request: TCGETS
 	mov  rdx, termios        ; request data
 	syscall
+
+	; save flags
+	xor rax, rax
+	mov al,  [termios + termios_type.c_lflag]
+	mov byte [default_termios_lflag], al
 	; Modify flags
-	and byte [termios + termios_type.c_lflag], 0FDh  ; Clear ICANON to disable canonical mode
+	and byte [termios + termios_type.c_lflag], 0xFD  ; Clear ICANON to disable canonical mode
+
+	; Write termios structure back
+	mov  eax, 16             ; syscall number: SYS_ioctl
+	mov  edi, 0              ; fd:      STDIN_FILENO
+	mov  esi, 0x5402         ; request: TCSETS
+	mov  rdx, termios        ; request data
+	syscall
 
 	pop rdi
 	pop rsi
@@ -66,6 +76,10 @@ disable_key_read:
 	push rsi
 	push rdi
 
+	;xor rax, rax
+	mov  al, [default_termios_lflag]
+	;or byte[termios + termios_type.c_lflag], al
+
 	; Write termios structure back
 	mov  eax, 16             ; syscall number: SYS_ioctl
 	mov  edi, 0              ; fd:      STDIN_FILENO
@@ -81,7 +95,6 @@ disable_key_read:
 	pop rax
 ret
 
-
 section .bss
 ; DECLARATIONS
 struc termios_type
@@ -95,6 +108,9 @@ endstruc
 
 ; INSTANTIATION
 termios: resb termios_type_size
+
+; default state
+default_termios_lflag: resb 1
 
 
 

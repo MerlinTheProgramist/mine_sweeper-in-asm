@@ -24,10 +24,6 @@
 	pop 	rax
 %endmacro
 
-%macro print_endl 0 
-	print endl, 1
-%endmacro
-
 %macro clear_term 0
 	push rax
 

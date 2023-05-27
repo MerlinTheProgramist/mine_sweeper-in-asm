@@ -3,9 +3,30 @@
 	add rsp, 8
 %endmacro
 
-
+global print_num
+global print_endl
 
 section .text
+
+%macro print 2
+	push 	rax
+	push 	rbx
+	push 	rdx
+	push 	rsi
+	push 	rdi
+
+	mov 	rsi, %1; char*
+	mov 	rax, 1  ; sys_write
+	mov     rdi, 1	; std_out
+	mov 	rdx, %2	; size
+	syscall
+
+	pop 	rdi
+	pop 	rsi
+	pop 	rdx
+	pop 	rbx
+	pop 	rax
+%endmacro
 
 ; Print decimal representation of number
 ; rdx:rax is the number parameter
@@ -57,6 +78,10 @@ print_num:
 	pop rdx
 	pop rbx
 	pop rax
+	ret
+
+print_endl:
+	print endl, 1
 	ret
 
 section .data

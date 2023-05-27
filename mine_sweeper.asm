@@ -4,6 +4,13 @@ global _start
 %include "libs/macros.asm"
 extern nextRand
 
+extern sys_read
+extern enable_key_read
+extern disable_key_read
+
+extern print_endl
+extern print_num
+
 ; Project DESCRIPTION:
 ; Each matrix cell stores information: 
 ;   - is_revealed
@@ -16,7 +23,7 @@ extern nextRand
 %define TRUE 1
 %define FALSE 0
 
-%define BOARD_SIZE 7 ; 2^n -1
+%define BOARD_SIZE 20 ; 2^n -1 max=127
 %define NOMINAL    00000000b
 %define REVEALED   10000000b
 %define BOMB       01000000b
@@ -35,26 +42,6 @@ extern nextRand
 %define CURSOR_HIGHLIGHT_START_LEN 5
 %define CURSOR_HIGHLIGHT_END "\e[0m"
 %define CURSOR_HIGHLIHGT_END_LEN 5
-
-sys_read:
-	push rax
-	push rbx
-	push rdi
-	push rdx
-	push rsi
-
-	mov 	rax, 0
-	mov 	rdi, 1
-	mov		rsi, input_buffer
-	mov 	rdx, 1
-	syscall
-
-	pop rsi
-	pop rdx
-	pop rdi
-	pop rbx
-	pop rax
-	ret
 
 %define BOMB_PROBABILITY 3
 %define HALF_QWORD, 4294967296
@@ -106,19 +93,17 @@ print_matrix:
             mul    rbx ;rax *= BOARD_SIZE
             add    rax, rdi
             mov    al, BYTE[matrix + rax] ; could swap for lea            
-            
-                                             ; not a cursor
 
-            cmp    rsi, [cursor_pos + Pos.y]                                    ; if its the cursor pos.y
+            cmp    sil, [cursor_pos + Pos.y]                                    ; if its the cursor pos.y
             jnz _not_cursor
-            cmp    rdi, [cursor_pos + Pos.x]                                    ; if its the cursor pos.x
+            cmp    dil, [cursor_pos + Pos.x]                                    ; if its the cursor pos.x
             jnz _not_cursor
                 %define START_H  0x31335b1b
                 %define START_H2 0x6d ; len 5
-                mov     DWORD[print_buffer + r8], START_H;ESC | "[31"<<8 | 'm'<<24                        ; split this color code on two moves because it is not a power of 2 len
+                mov     DWORD[print_buffer + r8], START_H; split this color code on two moves because it is not a power of 2 len
                 mov     BYTE[print_buffer + r8 + 4], START_H2
                 add     r8, 5               ; calculate print_index
-                mov     r15, 1                                           ; a cursor :)
+                mov     r15, 1              ; mark a cursor :)
             _not_cursor:
             
 
@@ -174,7 +159,7 @@ print_matrix:
         cmp    rsi, BOARD_SIZE
         jnz _pm_for_y
 
-    
+
     
 
     ; print rows buffer
@@ -192,14 +177,63 @@ _start:
     ; call print_endl
     call generate_board
 
-    xor  rcx, rcx
+    _game_loop:
+        call print_matrix
+
+        call enable_key_read
+
+        call sys_read
+        
+        ; call print_num
+        call disable_key_read
+
+        xor     rdx, rdx
+        cmp     rax, 119
+        jnz _not_w
+            dec dl
+            jmp _read_end
+        _not_w:
+        cmp     rax, 's'
+        jnz _not_s
+            inc dl
+            jmp _read_end
+        _not_s:
+        cmp     rax, 'a'
+        jnz _not_a
+            dec dh
+            jmp _read_end
+        _not_a:
+        cmp     rax, 'd'
+        jnz _not_d
+            inc dh
+            jmp _read_end
+        _not_d:
+
+        _read_end:
+
+        
+        add dl, byte[cursor_pos+Pos.y]  ; temporary add
+        add dh, byte[cursor_pos+Pos.x]  ; temporary add
+        ; if (y == SIZE or y<0) then dont save to mem
+        cmp dl, BOARD_SIZE 
+        je _dont_change_y
+        cmp dl, 0
+        jl _dont_change_y
+            mov byte[cursor_pos+Pos.y], dl
+        _dont_change_y:
+
+        cmp dh, BOARD_SIZE 
+        je _dont_change_x
+        cmp dh, 0
+        jl _dont_change_x
+            mov byte[cursor_pos+Pos.x], dh
+        _dont_change_x:
+        
+        
+
+        call print_endl
     
-    
-
-
-    call print_matrix
-
-    ; call print_endl
+    jmp _game_loop
 
     sys_exit
 
