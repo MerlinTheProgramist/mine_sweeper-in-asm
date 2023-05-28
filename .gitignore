@@ -2,7 +2,7 @@
 # ignore all
 *
 # unignore all with extensions
-!.*.
+!*.*
 # unignore all directories
 !*/
 # unignore this file
