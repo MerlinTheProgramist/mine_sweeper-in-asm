@@ -1,13 +1,19 @@
+global get_rdtsc, genRandSeed
 global nextRand
 
 
 section .text
 ; retrun CPU time to RAX
-%macro get_rdtsc 0 
+genRandSeed:
+get_rtsc:
+	  push 	  rdx
+	
     rdtsc ; edx:eax
     shr     rdx, 32
     or      rax, rdx
-%endmacro
+
+		pop rdx
+ret
 
 ; Divident is RAX
 ; return is RAX

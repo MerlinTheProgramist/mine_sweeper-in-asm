@@ -24,6 +24,29 @@
 	pop 	rax
 %endmacro
 
+%macro static_print 1
+%strlen len %1
+
+	push 	rax
+	push 	rbx
+	push 	rdx
+	push 	rsi
+	push 	rdi
+
+
+	mov 	rsi, %1 ; char*
+	mov 	rax, 1  ; sys_write
+	mov   rdi, 1	; std_out
+	mov 	rdx, len; size
+	syscall
+
+	pop 	rdi
+	pop 	rsi
+	pop 	rdx
+	pop 	rbx
+	pop 	rax
+%endmacro
+
 %macro clear_term 0
 	push rax
 

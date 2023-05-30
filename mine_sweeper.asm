@@ -2,6 +2,8 @@ section .text
 global _start
 
 %include "libs/macros.asm"
+
+extern genRandSeed
 extern nextRand
 
 extern sys_read
@@ -11,6 +13,8 @@ extern disable_key_read
 extern print_endl
 extern print_num
 
+
+
 ; Project DESCRIPTION:
 ; Each matrix cell stores information: 
 ;   - is_revealed
@@ -18,10 +22,12 @@ extern print_num
 ;   - has_count (count is calculated on generation of the grid )
 
 ; TODO:
-; 
+; - 
 
 %define TRUE 1
 %define FALSE 0
+
+%define RAND_HALF 0 ; 2181630000 
 
 %define BOARD_SIZE 20 ; 2^n -1 max=127
 %define NOMINAL    00000000b
@@ -50,7 +56,7 @@ extern print_num
 generate_board:
     mov BYTE[mines_left], 0
 
-    get_rdtsc ; rax
+    call genRandSeed; rax
     mov     rsi, 0
     _gen_board_for:
         push    rsi 
@@ -60,12 +66,12 @@ generate_board:
         
         ; if rax > HARF_QWORD => matrix[rsi] = BOMB 
         ; else => matrix[ris] = NOMINAL
-        cmp     rax, 2077351922
+        cmp     rax, RAND_HALF
         jg  _gen_greater
-            mov     BYTE[matrix + rsi], NOMINAL
+            mov     BYTE[matrix + rsi], BOMB
             jmp _gen_greater_skip
         _gen_greater:
-        mov     BYTE[matrix + rsi], BOMB
+        mov     BYTE[matrix + rsi], NOMINAL
         inc     BYTE[mines_left]
         _gen_greater_skip:
 
@@ -75,10 +81,22 @@ generate_board:
         cmp     rsi, BOARD_SIZE*BOARD_SIZE
         jnz _gen_board_for
 
+    mov     rsi, BOARD_SIZE*BOARD_SIZE
+    gen_count:
+        push    rsi
+
+
+        pop     rsi
+        dec     rsi
+        test    rsi, rsi
+        jnz     gen_count
+        
+    
     ret
 
 print_matrix:
-    clear_term
+    ;clear_term
+    
     xor     r8, r8 ; zero the index
     xor     r15,r15
 
@@ -175,7 +193,10 @@ print_matrix:
     ret
 
 game_over:
+    call print_matrix
 
+    print game_over_text,  game_over_len
+    
     sys_exit
 ret
 
@@ -200,11 +221,11 @@ ret
     xor     rax, rax
 ret
 
-; uncover tile on:
+; reveal tile on:
 ; cl for x
 ; dl for y
 ; r8 for auto: 1 for auto
-uncover:
+reveal:
     push rax
     push rbx
     push rcx
@@ -213,57 +234,57 @@ uncover:
     
     call is_pos_valid ; if position not valid then return
     test  rax, 1
-    jz uncover.nothing
+    jz reveal.nothing
         
-
-    ; mov dh, [cursor_pos+Pos.x]
-
     ; selected cell rax
     xor    rax, rax
     mov    al, cl
     mov    rbx, BOARD_SIZE
-    mul    rbx ;ax = al * BOARD_SIZE
+    mul    bl ;ax = al * BOARD_SIZE
     add    al, dl
 
-    mov    al, BYTE[matrix + rax]
+    xor    rbx, rbx
+    mov    bl, BYTE[matrix + rax]
 
-    ; do nothing when tile is uncovered, if either cursor or auto
-    test    al, REVEALED
-    jz uncover.continue
-        ret
-    .continue
+    ; do nothing when tile is revealed, if either cursor or auto
+    test    bl, REVEALED
+    jnz reveal.nothing
+        
+    test   bl, BOMB ; if BOMB
+    jnz     reveal.bomb
     
-    
-    test   al, BOMB ; if BOMB
-    jz     uncover.bomb
-    
+    ; if count: then stop revealing more
+    test    bl, HAS_COUNT
+    jnz     reveal.nothing
 
-    ; if count: then stop uncovering more
-    test    al, HAS_COUNT
-    jnz     uncover.nothing
+    ; firstly reveal this tile
+    or byte[matrix + rax], REVEALED
 
-    ; uncover all neighbors
+    ; reveal all neighbors
     mov r8, 1 ; as auto
     
     ; north
     dec dl   
-    call uncover
+    call reveal
     ; east
     inc  dl   
     inc  cl   
-    call uncover
+    call reveal
     ; south
     inc  dl
     dec  cl   
-    call uncover
+    call reveal
     ; west
     dec  dl 
     dec  cl   
-    call uncover
+    call reveal
 
+    ; skip beyond bomb case
+    jmp reveal.nothing
+    
     .bomb:
     test   r8, 1    ; if clicked
-    jnz     uncover.nothing ; if auto and bomb then dont show anything
+    jnz     reveal.nothing ; if auto and bomb then dont show anything
         call game_over ; then game over
     
 
@@ -286,7 +307,7 @@ flag:
     test BYTE[matrix + rax], REVEALED
     jnz flag.nothing
 
-    or   BYTE[matrix + rax], FLAGGED
+    xor   BYTE[matrix + rax], FLAGGED
 
     flag.nothing:
 ret
@@ -302,10 +323,10 @@ _start:
     call generate_board
     mov  BYTE[matrix+1], FLAGGED
     
-    mov  cl, [cursor_pos+Pos.y]
-    mov  dl, [cursor_pos+Pos.x]
-    xor  r8, r8
-    call uncover
+    ; mov  cl, 3
+    ; mov  dl, 4
+    ; xor  r8, r8
+    ; call reveal
 
     _game_loop:
         call print_matrix
@@ -319,29 +340,29 @@ _start:
             cmp     rax, 119
             jnz input.w
                 dec dl
-                jmp input.end
+                jmp .move_resolve
             .w:
             cmp     rax, 's'
             jnz input.s
                 inc dl
-                jmp input.end
+                jmp .move_resolve
             .s:
             cmp     rax, 'a'
             jnz input.a
                 dec dh
-                jmp input.end
+                jmp .move_resolve
             .a:
             cmp     rax, 'd'
             jnz input.d
                 inc dh
-                jmp input.end
+                jmp .move_resolve
             .d:
             cmp     rax, 'r'
             jnz input.e
-                mov  cl, [cursor_pos+Pos.y]
-                mov  dl, [cursor_pos+Pos.x]
+                mov  cl, [cursor_pos+Pos.x]
+                mov  dl, [cursor_pos+Pos.y]
                 xor  r8, r8
-                call uncover
+                call reveal
                 jmp input.end
             .e:
             cmp     rax, 'f'
@@ -351,28 +372,27 @@ _start:
             .f:
             ; if nothing from supported symboles was used 
             jmp input   ; read input again
-            input.end:
 
+            .move_resolve
         
-        add dl, byte[cursor_pos+Pos.y]  ; temporary add
-        add dh, byte[cursor_pos+Pos.x]  ; temporary add
-        ; if (y == SIZE or y<0) then dont save y to mem
-        cmp dl, BOARD_SIZE 
-        je _dont_change_y
-        cmp dl, 0
-        jl _dont_change_y
-            mov byte[cursor_pos+Pos.y], dl
-        _dont_change_y:
-        ; if (x == SIZE or x<0) then dont save x to mem
-        cmp dh, BOARD_SIZE 
-        je _dont_change_x
-        cmp dh, 0
-        jl _dont_change_x
-            mov byte[cursor_pos+Pos.x], dh
-        _dont_change_x:
+            add dl, byte[cursor_pos+Pos.y]  ; temporary add
+            add dh, byte[cursor_pos+Pos.x]  ; temporary add
+            ; if (y == SIZE or y<0) then dont save y to mem
+            cmp dl, BOARD_SIZE 
+            je .dont_change_y
+            cmp dl, 0
+            jl .dont_change_y
+                mov byte[cursor_pos+Pos.y], dl
+            .dont_change_y:
+            ; if (x == SIZE or x<0) then dont save x to mem
+            cmp dh, BOARD_SIZE 
+            je .dont_change_x
+            cmp dh, 0
+            jl .dont_change_x
+                mov byte[cursor_pos+Pos.x], dh
+            .dont_change_x:
         
-
-
+        .end:
 
 
         call print_endl
@@ -394,6 +414,10 @@ endstruc
 
 section .data
 matrix: times BOARD_SIZE*BOARD_SIZE db 00100000b
+
+game_over_text db ENDL_CHAR,"Game over, you encounter a mine Ó", ENDL_CHAR
+game_over_len equ $-game_over_text
+
 
 section .bss
 input_buffer: resb 1

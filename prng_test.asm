@@ -1,14 +1,19 @@
 section .text
 global _start
 
-%include "print.asm"
-%include "PRNG.asm"
+extern genRandSeed
+extern nextRand
+
+extern print_num
+extern print_endl
+
+%include "libs/macros.asm"
 
 _start:	
 
-	get_rdtsc
+	call genRandSeed
 
-	mov 	rsi, 1 ; i=0
+	mov 	rsi, 50 ; i=0
 	_for:
 	push 	rsi
 	
