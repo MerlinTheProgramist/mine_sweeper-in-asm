@@ -81,10 +81,116 @@ generate_board:
         cmp     rsi, BOARD_SIZE*BOARD_SIZE
         jnz _gen_board_for
 
-    mov     rsi, BOARD_SIZE*BOARD_SIZE
+    
     gen_count:
-        push    rsi
+        ; if matrix index is negative or greater than BOARF_SIZE**2 then its invalid
 
+        ; O | O | O
+        ; O | X | O
+        ; O | O | O
+
+        ; if x == BOARD_SIZE
+        ;     then dont check right
+        ; if x % BOARD_SI
+        
+        xor     rdx, rdx
+        xor     rcx, rdx
+
+        ; start from BOARD_SIZE-1 to exclude borders
+        mov     dl, BOARD_SIZE-1; y
+
+        ; while dl > 0
+        .for_y
+
+            
+            mov     cl, BOARD_SIZE-1; x    
+            .for_x
+
+                ; sounding cell
+                mov    al, dl
+                mov    rbx, BOARD_SIZE
+                mul    bl ; ax *= BOARD_SIZE
+                add    rax, rcx
+                lea    rax, BYTE[matrix + rax] ; load address of THIS cell to rax  
+                push   rax      ; save the original address
+                
+                mov    rbx, -1; set count to minimum <=> -1
+
+                ; check every address around
+                ; inc rax if BOMB
+
+                dec    rax
+                test   BYTE[rax], BOMB
+                jz     .l
+                    inc rbx
+                .l
+
+                sub    rax, BOARD_SIZE-1
+                test   BYTE[rax], BOMB
+                jz     .tr
+                    inc rbx
+                .tr
+
+                dec    rax
+                test   BYTE[rax], BOMB
+                jz     .t
+                    inc rbx
+                .t
+                
+                dec    rax
+                test   BYTE[rax], BOMB
+                jz     .tl
+                    inc rbx
+                .tl
+
+
+                mov    rax, [rsp]
+
+                
+                inc    rax
+                test   BYTE[rax], BOMB
+                jz     .r
+                    inc rbx
+                .r
+
+                add    rax, BOARD_SIZE-1
+                test   BYTE[rax], BOMB
+                jz     .bl
+                    inc rbx
+                .bl
+
+                inc    rax
+                test   BYTE[rax], BOMB
+                jz     .b
+                    inc rbx
+                .b
+                
+                inc    rax
+                test   BYTE[rax], BOMB
+                jz     .br
+                    inc rbx
+                .br
+
+
+                pop    rax          ; restore ariginal cell address
+                
+                ; if no-bombs <=> rbx == -1
+                ; then do nothing
+                cmp    rbx, -1
+                je    .skip_cell           
+
+                ; set HAS_COUNT flag and the actuall COUNT
+                or     BYTE[rax], HAS_COUNT
+                or     BYTE[rax], bl; assuming that COUNT section is 0
+                
+                .skip_cell          
+
+            dec cl
+            cmp cl, 0
+            jg    .for_x
+        dec dl
+        cmp dl, 0
+        jg    .for_y
 
         pop     rsi
         dec     rsi
@@ -93,6 +199,14 @@ generate_board:
         
     
     ret
+
+%macro is_bomb 1
+
+    test %1, BOMB
+    
+
+%endmacro 
+
 
 print_matrix:
     ;clear_term
@@ -199,6 +313,7 @@ game_over:
     
     sys_exit
 ret
+
 
 ; cl for x
 ; dl for y
@@ -321,7 +436,9 @@ _start:
     ; call print_endl
     
     call generate_board
-    mov  BYTE[matrix+1], FLAGGED
+    
+    mov  BYTE[matrix+1], BOMB
+    mov  BYTE[matrix+BOARD_SIZE+4], BOMB
     
     ; mov  cl, 3
     ; mov  dl, 4
