@@ -18,8 +18,19 @@ _start:
 	push 	rsi
 	
 	call nextRand
+
+	cmp  rax, 1508451927
+	jg g
+	print less, 1
+	jmp endl
+	g:
+	print greater,1
+	endl:
+	call print_endl
+
     call print_num ; number already in rax
     call print_endl
+
 
 	pop rsi
 	dec 	rsi
@@ -27,3 +38,7 @@ _start:
 	jnz _for
 
 	sys_exit
+
+section .data
+greater db 'g'
+less 	db 'l'

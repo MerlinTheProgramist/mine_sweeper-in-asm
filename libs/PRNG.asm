@@ -3,16 +3,17 @@ global nextRand
 
 
 section .text
+
 ; retrun CPU time to RAX
 genRandSeed:
 get_rtsc:
-	  push 	  rdx
+	push 	  rdx
 	
     rdtsc ; edx:eax
     shr     rdx, 32
     or      rax, rdx
 
-		pop rdx
+	pop rdx
 ret
 
 ; Divident is RAX

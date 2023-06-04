@@ -15,6 +15,7 @@ section .text
 	push 	rsi
 	push 	rdi
 
+
 	mov 	rsi, %1; char*
 	mov 	rax, 1  ; sys_write
 	mov     rdi, 1	; std_out
@@ -78,7 +79,7 @@ print_num:
 	pop rdx
 	pop rbx
 	pop rax
-	ret
+ret
 
 print_endl:
 	print endl, 1

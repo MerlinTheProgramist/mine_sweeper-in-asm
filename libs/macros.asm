@@ -10,6 +10,7 @@
 	push 	rdx
 	push 	rsi
 	push 	rdi
+	push  	r8
 
 	mov 	rsi, %1; char*
 	mov 	rax, 1  ; sys_write
@@ -17,6 +18,7 @@
 	mov 	rdx, %2	; size
 	syscall
 
+	pop 	r8
 	pop 	rdi
 	pop 	rsi
 	pop 	rdx
@@ -33,10 +35,10 @@
 	push 	rsi
 	push 	rdi
 
-
-	mov 	rsi, %1 ; char*
+	push    %1
+	mov 	rsi, rsp ; char*
 	mov 	rax, 1  ; sys_write
-	mov   rdi, 1	; std_out
+	mov     rdi, 1	; std_out
 	mov 	rdx, len; size
 	syscall
 

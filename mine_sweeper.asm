@@ -27,20 +27,21 @@ extern print_num
 %define TRUE 1
 %define FALSE 0
 
-%define RAND_HALF 0 ; 2181630000 
 
-%define BOARD_SIZE 20 ; 2^n -1 max=127
+%define BOARD_SIZE 16 ; 2^n -1 max=127
 %define NOMINAL    00000000b
 %define REVEALED   10000000b
 %define BOMB       01000000b
 %define FLAGGED    00100000b
-%define CURSOR     00010000b
+
+%define UNDEFINED_YET 00010000b ; UNDEFINED FLAG
+
 %define HAS_COUNT  00001000b
 %define COUNT_MASK 00000111b
 
 %define NREV_CHAR '#'
-%define BOMB_CHAR '*'
-%define FLAG_CHAR 'F'
+%define BOMB_CHAR 'B'
+%define FLAG_CHAR '%'
 %define EMPT_CHAR '.'
 %define ENDL_CHAR 0ah
 
@@ -50,37 +51,51 @@ extern print_num
 %define CURSOR_HIGHLIGHT_END "\e[0m"
 %define CURSOR_HIGHLIHGT_END_LEN 5
 
-%define BOMB_PROBABILITY 3
-%define HALF_QWORD, 4294967296
+%define HALF_RAND 1008451927    ; mess with this value please
+
+
+
+%macro add_bomb 1
+    inc QWORD[bomb_count]
+    mov QWORD[matrix+%1], BOMB
+%endmacro
+
 
 generate_board:
-    mov BYTE[mines_left], 0
+    mov QWORD[bomb_count], 0
+    mov QWORD[revealed_counter], 0
 
     call genRandSeed; rax
-    mov     rsi, 0
+
+    mov     rsi, BOARD_SIZE*BOARD_SIZE
     _gen_board_for:
-        push    rsi 
-        push    rax
 
         call    nextRand
         
         ; if rax > HARF_QWORD => matrix[rsi] = BOMB 
         ; else => matrix[ris] = NOMINAL
-        cmp     rax, RAND_HALF
-        jg  _gen_greater
-            mov     BYTE[matrix + rsi], BOMB
+        cmp     rax, HALF_RAND
+        ja  _gen_greater
+            add_bomb rsi
             jmp _gen_greater_skip
         _gen_greater:
         mov     BYTE[matrix + rsi], NOMINAL
-        inc     BYTE[mines_left]
         _gen_greater_skip:
 
-        pop     rax
-        pop     rsi
-        inc     rsi
-        cmp     rsi, BOARD_SIZE*BOARD_SIZE
-        jnz _gen_board_for
+        dec     rsi
+        cmp     rsi, 0
+        jnl _gen_board_for
 
+
+    ; add_bomb 1
+    ; add_bomb BOARD_SIZE+4
+
+    ; add_bomb BOARD_SIZE*2+10
+    add_bomb BOARD_SIZE*4+10
+    add_bomb BOARD_SIZE*3+11
+
+    add_bomb BOARD_SIZE*3+BOARD_SIZE-1
+    add_bomb BOARD_SIZE-1
     
     gen_count:
         ; if matrix index is negative or greater than BOARF_SIZE**2 then its invalid
@@ -92,81 +107,109 @@ generate_board:
         ; if x == BOARD_SIZE
         ;     then dont check right
         ; if x % BOARD_SI
-        
+        %define TOP    10000000
+        %define BOTTOM 01000000
+        %define LEFT   00100000
+        %define RIGHT  00010000
+        xor     r8,  r8  ; in r8 we store if cell is border case
         xor     rdx, rdx
         xor     rcx, rdx
 
+        ; this is the first row from BOTTOM
+        or     r8, BOTTOM
+
         ; start from BOARD_SIZE-1 to exclude borders
         mov     dl, BOARD_SIZE-1; y
-
-        ; while dl > 0
+        full:
+        ; while dl >= 0
         .for_y
 
-            
+            or     r8, RIGHT
+            and    r8, ~LEFT
+
             mov     cl, BOARD_SIZE-1; x    
             .for_x
 
                 ; sounding cell
+                xor    rax, rax
                 mov    al, dl
-                mov    rbx, BOARD_SIZE
+                mov    bl, BOARD_SIZE
                 mul    bl ; ax *= BOARD_SIZE
-                add    rax, rcx
+                add    ax, cx
                 lea    rax, BYTE[matrix + rax] ; load address of THIS cell to rax  
                 push   rax      ; save the original address
                 
                 mov    rbx, -1; set count to minimum <=> -1
 
                 ; check every address around
-                ; inc rax if BOMB
+                ; |←|←|←| 
+                ; |←|x |→|
+                ; |→|→|→|
+                ; inc rbx if BOMB
 
-                dec    rax
-                test   BYTE[rax], BOMB
+                test   r8, LEFT
+                jnz    .l
+
+
+                test   BYTE[rax-1], BOMB
                 jz     .l
                     inc rbx
                 .l
 
-                sub    rax, BOARD_SIZE-1
-                test   BYTE[rax], BOMB
+                test    r8, TOP     
+                jnz    .tl          ; skip all top checks
+
+                test    r8, RIGHT
+                jnz    .tr   
+
+                test   BYTE[rax - BOARD_SIZE + 1], BOMB
                 jz     .tr
                     inc rbx
                 .tr
 
-                dec    rax
-                test   BYTE[rax], BOMB
+                test   BYTE[rax - BOARD_SIZE], BOMB
                 jz     .t
                     inc rbx
                 .t
                 
-                dec    rax
-                test   BYTE[rax], BOMB
+                test   r8, LEFT
+                jnz .tl              
+
+                test   BYTE[rax - BOARD_SIZE - 1], BOMB
                 jz     .tl
                     inc rbx
                 .tl
 
 
-                mov    rax, [rsp]
+                test    r8, RIGHT
+                jnz    .r
 
                 
-                inc    rax
-                test   BYTE[rax], BOMB
+                test   BYTE[rax + 1], BOMB
                 jz     .r
                     inc rbx
                 .r
 
-                add    rax, BOARD_SIZE-1
-                test   BYTE[rax], BOMB
+                test   r8, BOTTOM
+                jnz .br          ; skip all bottom checks   
+
+                test   r8, LEFT
+                jnz .bl              
+                
+                test   BYTE[rax + BOARD_SIZE - 1], BOMB
                 jz     .bl
                     inc rbx
                 .bl
 
-                inc    rax
-                test   BYTE[rax], BOMB
+                test   BYTE[rax + BOARD_SIZE], BOMB
                 jz     .b
                     inc rbx
                 .b
                 
-                inc    rax
-                test   BYTE[rax], BOMB
+                test   r8, RIGHT
+                jnz .br     
+
+                test   BYTE[rax + BOARD_SIZE + 1], BOMB
                 jz     .br
                     inc rbx
                 .br
@@ -185,27 +228,27 @@ generate_board:
                 
                 .skip_cell          
 
+            and r8, ~RIGHT
+
             dec cl
             cmp cl, 0
-            jg    .for_x
+            jnz .not_last_x ; if 0 then mark LEFT border
+                or  r8, LEFT ; modifies flags
+                cmp cl, 0
+            .not_last_x
+            jge    .for_x
+
+        and r8, ~BOTTOM
+
         dec dl
         cmp dl, 0
-        jg    .for_y
-
-        pop     rsi
-        dec     rsi
-        test    rsi, rsi
-        jnz     gen_count
-        
+        jnz .not_last_y ; if 0 then mark TOP border
+            or   r8, TOP ; modifies flags
+            cmp dl, 0
+        .not_last_y
+        jge    .for_y
     
     ret
-
-%macro is_bomb 1
-
-    test %1, BOMB
-    
-
-%endmacro 
 
 
 print_matrix:
@@ -271,8 +314,7 @@ print_matrix:
                 jmp     _pm_for_continue                                ; continue
             _not_count:
             
-
-            mov     BYTE[print_buffer + r8], EMPT_CHAR       ; print_row_buffer[rdi] = ' '
+            mov     BYTE[print_buffer + r8], EMPT_CHAR                  ; print_row_buffer[rdi] = EMPT_CHAR
 
             _pm_for_continue:
             inc    r8           ; inc print_buffer_index 
@@ -307,12 +349,33 @@ print_matrix:
     ret
 
 game_over:
+    call print_endl
     call print_matrix
 
     print game_over_text,  game_over_len
     
     sys_exit
 ret
+
+game_win:
+    call print_endl
+    call print_matrix
+
+    print game_win_text, game_win_len
+
+    sys_exit
+
+%macro jump_if_pos_invalid 1
+    cmp cl, BOARD_SIZE
+    je  %1
+    cmp cl, 0
+    jl  %1
+
+    cmp dl, BOARD_SIZE
+    je  %1
+    cmp dl, 0
+    jl  %1
+%endmacro
 
 
 ; cl for x
@@ -346,34 +409,46 @@ reveal:
     push rcx
     push rdx
     push r8
-    
+
     call is_pos_valid ; if position not valid then return
-    test  rax, 1
+    test  rax, rax
     jz reveal.nothing
         
     ; selected cell rax
     xor    rax, rax
-    mov    al, cl
-    mov    rbx, BOARD_SIZE
+    mov    al, dl
+    mov    bl, BOARD_SIZE
     mul    bl ;ax = al * BOARD_SIZE
-    add    al, dl
+    add    al, cl
 
     xor    rbx, rbx
     mov    bl, BYTE[matrix + rax]
 
+
+    test    bl, BOMB ; if BOMB
+    jz     reveal.not_bomb
+        test   r8, r8                ; if clicked <=> r8 = 0
+        jnz    .nothing              ; if auto and bomb then dont reveal other
+            or    byte[matrix + rax], REVEALED
+            and   byte[matrix + rax], ~FLAGGED
+            call game_over           ; then game over
+    .not_bomb:
+
     ; do nothing when tile is revealed, if either cursor or auto
     test    bl, REVEALED
-    jnz reveal.nothing
-        
-    test   bl, BOMB ; if BOMB
-    jnz     reveal.bomb
+    jnz     reveal.nothing
     
+
+    ; firstly reveal this tile and clear FLAG
+    or    byte[matrix + rax], REVEALED
+    and   byte[matrix + rax], ~FLAGGED
+
+    ; update revealed counter
+    inc QWORD[revealed_counter]
+
     ; if count: then stop revealing more
     test    bl, HAS_COUNT
     jnz     reveal.nothing
-
-    ; firstly reveal this tile
-    or byte[matrix + rax], REVEALED
 
     ; reveal all neighbors
     mov r8, 1 ; as auto
@@ -393,16 +468,7 @@ reveal:
     dec  dl 
     dec  cl   
     call reveal
-
-    ; skip beyond bomb case
-    jmp reveal.nothing
     
-    .bomb:
-    test   r8, 1    ; if clicked
-    jnz     reveal.nothing ; if auto and bomb then dont show anything
-        call game_over ; then game over
-    
-
     .nothing:
     pop r8
     pop rdx
@@ -437,13 +503,13 @@ _start:
     
     call generate_board
     
-    mov  BYTE[matrix+1], BOMB
-    mov  BYTE[matrix+BOARD_SIZE+4], BOMB
     
-    ; mov  cl, 3
-    ; mov  dl, 4
+    
+    ; mov  cl, 1
+    ; mov  dl, 0
     ; xor  r8, r8
     ; call reveal
+
 
     _game_loop:
         call print_matrix
@@ -480,6 +546,13 @@ _start:
                 mov  dl, [cursor_pos+Pos.y]
                 xor  r8, r8
                 call reveal
+
+                ; if revealed_counter + bomb_count = BOARD_SIZE*BOARD_SIZE
+                mov  rax,   [revealed_counter]
+                add  rax,   [bomb_count]
+                cmp  rax,   BOARD_SIZE*BOARD_SIZE
+                jne input.end
+                    call game_win
                 jmp input.end
             .e:
             cmp     rax, 'f'
@@ -513,6 +586,14 @@ _start:
 
 
         call print_endl
+
+        mov  rax, [revealed_counter]
+        call print_num
+        call print_endl
+
+        mov  rax, [bomb_count]
+        call print_num
+        call print_endl
     
     jmp _game_loop
 
@@ -532,9 +613,14 @@ endstruc
 section .data
 matrix: times BOARD_SIZE*BOARD_SIZE db 00100000b
 
-game_over_text db ENDL_CHAR,"Game over, you encounter a mine Ó", ENDL_CHAR
+game_over_text db ENDL_CHAR,"Game over, you encounter a mine!", ENDL_CHAR
 game_over_len equ $-game_over_text
 
+game_win_text db ENDL_CHAR,"YOU WON! Congratulations and have a great day", ENDL_CHAR
+game_win_len equ $-game_win_text
+
+debug_text db ENDL_CHAR,"THIS IS A DEBUG MESSEGE", ENDL_CHAR
+debug_text_len equ $-debug_text
 
 section .bss
 input_buffer: resb 1
@@ -547,4 +633,5 @@ print_buffer_len: equ $print_buffer
 cursor_pos: resb 2
 ; cursor_blink: resb 1
 
-mines_left: resb 1
+bomb_count: resq 1
+revealed_counter: resq 1
