@@ -28,7 +28,7 @@ extern print_num
 %define FALSE 0
 
 
-%define BOARD_SIZE 16 ; 2^n -1 max=127
+%define BOARD_SIZE 20 ; 2^n -1 max=127
 %define NOMINAL    00000000b
 %define REVEALED   10000000b
 %define BOMB       01000000b
@@ -46,12 +46,8 @@ extern print_num
 %define ENDL_CHAR 0ah
 
 %define ESC  0x1B
-%define CURSOR_HIGHLIGHT_START "\e[3m"
-%define CURSOR_HIGHLIGHT_START_LEN 5
-%define CURSOR_HIGHLIGHT_END "\e[0m"
-%define CURSOR_HIGHLIHGT_END_LEN 5
 
-%define HALF_RAND 800000000;1008451927    ; greater means more mines
+%define HALF_RAND 600000000;1008451927    ; greater means more mines
 
 
 
@@ -309,7 +305,7 @@ print_matrix:
             cmp     r15, 1
             jnz __not_cursor
                 %define END_H 0x6d305b1b ; len 4
-                mov     DWORD[print_buffer + r8], END_H 
+                mov     DWORD[print_buffer + r8], END_H
                 add     r8, 4
                 xor    r15, r15
             __not_cursor:
@@ -597,6 +593,8 @@ game_win_len equ $-game_win_text
 
 debug_text db ENDL_CHAR,    "THIS IS A DEBUG MESSEGE", ENDL_CHAR
 debug_text_len equ $-debug_text
+
+end_hightlight dd 0x6d305b1b
 
 section .bss
 cursor_pos: resb 2

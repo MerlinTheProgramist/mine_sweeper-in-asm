@@ -8,6 +8,8 @@
 # unignore this file
 !.*
 
+!Makefile
+
 # ignore specific extensions
 *.o
 *.txt
