@@ -51,13 +51,13 @@ extern print_num
 %define CURSOR_HIGHLIGHT_END "\e[0m"
 %define CURSOR_HIGHLIHGT_END_LEN 5
 
-%define HALF_RAND 1008451927    ; mess with this value please
+%define HALF_RAND 800000000;1008451927    ; greater means more mines
 
 
 
 %macro add_bomb 1
     inc QWORD[bomb_count]
-    mov QWORD[matrix+%1], BOMB
+    mov BYTE[matrix+%1], BOMB
 %endmacro
 
 
@@ -79,7 +79,7 @@ generate_board:
             add_bomb rsi
             jmp .greater_skip
         .greater:
-        mov     BYTE[matrix + rsi], NOMINAL
+            mov     BYTE[matrix + rsi], NOMINAL
         .greater_skip:
 
         dec     rsi
@@ -353,12 +353,12 @@ game_win:
 
 %macro jump_if_pos_invalid 1
     cmp cl, BOARD_SIZE
-    jg  %1
+    je  %1
     cmp cl, 0
     jl  %1
 
     cmp dl, BOARD_SIZE
-    jg  %1
+    je  %1
     cmp dl, 0
     jl  %1
 %endmacro
@@ -369,12 +369,12 @@ game_win:
 ; rax return
 is_pos_valid:
     cmp cl, BOARD_SIZE
-    jg  is_pos_valid.invalid
+    je  is_pos_valid.invalid
     cmp cl, 0
     jl  is_pos_valid.invalid
 
     cmp dl, BOARD_SIZE
-    jg  is_pos_valid.invalid
+    je  is_pos_valid.invalid
     cmp dl, 0
     jl  is_pos_valid.invalid
 
@@ -466,10 +466,10 @@ ret
 flag:
     ; selected cell rax
     xor    rax, rax
-    mov    al, [cursor_pos+Pos.y]
+    mov    al, BYTE[cursor_pos+Pos.y]
     mov    bl, BOARD_SIZE
     mul    bl ;ax = al * BOARD_SIZE
-    add    al, [cursor_pos+Pos.x]
+    add    al, BYTE[cursor_pos+Pos.x]
 
     test BYTE[matrix + rax], REVEALED
     jnz flag.nothing
@@ -514,9 +514,9 @@ _start:
                 jmp .move_resolve
             .d:
             cmp     rax, 'r'
-            jnz input.e
-                mov  cl, [cursor_pos+Pos.x]
-                mov  dl, [cursor_pos+Pos.y]
+            jnz input.r
+                mov  cl, BYTE[cursor_pos+Pos.x]
+                mov  dl, BYTE[cursor_pos+Pos.y]
                 xor  r8, r8
                 call reveal
 
@@ -528,7 +528,7 @@ _start:
                     call game_win
 
                 jmp .end
-            .e:
+            .r:
             cmp     rax, 'f'
             jnz input.f
                 call flag
@@ -561,6 +561,7 @@ _start:
 
         call print_endl
 
+        %ifdef DEBUG
         mov  rax, [revealed_counter]
         call print_num
         call print_endl
@@ -568,6 +569,7 @@ _start:
         mov  rax, [bomb_count]
         call print_num
         call print_endl
+        %endif
     
     jmp _game_loop
 
