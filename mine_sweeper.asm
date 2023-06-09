@@ -67,36 +67,25 @@ generate_board:
 
     call genRandSeed; rax
 
-    mov     rsi, BOARD_SIZE*BOARD_SIZE
-    _gen_board_for:
+    mov     rsi, BOARD_SIZE*BOARD_SIZE-1
+    .board_for:
 
         call    nextRand
         
         ; if rax > HARF_QWORD => matrix[rsi] = BOMB 
         ; else => matrix[ris] = NOMINAL
         cmp     rax, HALF_RAND
-        ja  _gen_greater
+        ja  .greater
             add_bomb rsi
-            jmp _gen_greater_skip
-        _gen_greater:
+            jmp .greater_skip
+        .greater:
         mov     BYTE[matrix + rsi], NOMINAL
-        _gen_greater_skip:
+        .greater_skip:
 
         dec     rsi
         cmp     rsi, 0
-        jnl _gen_board_for
+        jge .board_for
 
-
-    ; add_bomb 1
-    ; add_bomb BOARD_SIZE+4
-
-    ; add_bomb BOARD_SIZE*2+10
-    add_bomb BOARD_SIZE*4+10
-    add_bomb BOARD_SIZE*3+11
-
-    add_bomb BOARD_SIZE*3+BOARD_SIZE-1
-    add_bomb BOARD_SIZE-1
-    
     gen_count:
         ; if matrix index is negative or greater than BOARF_SIZE**2 then its invalid
 
@@ -107,25 +96,23 @@ generate_board:
         ; if x == BOARD_SIZE
         ;     then dont check right
         ; if x % BOARD_SI
-        %define TOP    10000000
-        %define BOTTOM 01000000
-        %define LEFT   00100000
-        %define RIGHT  00010000
-        xor     r8,  r8  ; in r8 we store if cell is border case
+        %define TOP    10000000b
+        %define BOTTOM 01000000b
+        %define LEFT   00100000b
+        %define RIGHT  00010000b
+        xor     r8b,  r8b  ; in r8b we store if cell is border case
         xor     rdx, rdx
         xor     rcx, rdx
 
         ; this is the first row from BOTTOM
-        or     r8, BOTTOM
+        or     r8b, BOTTOM
 
-        ; start from BOARD_SIZE-1 to exclude borders
+        ; start from y = BOARD_SIZE-1 
         mov     dl, BOARD_SIZE-1; y
-        full:
-        ; while dl >= 0
         .for_y
 
-            or     r8, RIGHT
-            and    r8, ~LEFT
+            or     r8b, RIGHT
+            and    r8b, ~LEFT
 
             mov     cl, BOARD_SIZE-1; x    
             .for_x
@@ -147,7 +134,7 @@ generate_board:
                 ; |→|→|→|
                 ; inc rbx if BOMB
 
-                test   r8, LEFT
+                test   r8b, LEFT
                 jnz    .l
 
 
@@ -156,10 +143,10 @@ generate_board:
                     inc rbx
                 .l
 
-                test    r8, TOP     
+                test    r8b, TOP     
                 jnz    .tl          ; skip all top checks
 
-                test    r8, RIGHT
+                test    r8b, RIGHT
                 jnz    .tr   
 
                 test   BYTE[rax - BOARD_SIZE + 1], BOMB
@@ -172,7 +159,7 @@ generate_board:
                     inc rbx
                 .t
                 
-                test   r8, LEFT
+                test   r8b, LEFT
                 jnz .tl              
 
                 test   BYTE[rax - BOARD_SIZE - 1], BOMB
@@ -181,7 +168,7 @@ generate_board:
                 .tl
 
 
-                test    r8, RIGHT
+                test    r8b, RIGHT
                 jnz    .r
 
                 
@@ -190,10 +177,10 @@ generate_board:
                     inc rbx
                 .r
 
-                test   r8, BOTTOM
+                test   r8b, BOTTOM
                 jnz .br          ; skip all bottom checks   
 
-                test   r8, LEFT
+                test   r8b, LEFT
                 jnz .bl              
                 
                 test   BYTE[rax + BOARD_SIZE - 1], BOMB
@@ -206,7 +193,7 @@ generate_board:
                     inc rbx
                 .b
                 
-                test   r8, RIGHT
+                test   r8b, RIGHT
                 jnz .br     
 
                 test   BYTE[rax + BOARD_SIZE + 1], BOMB
@@ -228,22 +215,22 @@ generate_board:
                 
                 .skip_cell          
 
-            and r8, ~RIGHT
+            and r8b, ~RIGHT
 
             dec cl
             cmp cl, 0
             jnz .not_last_x ; if 0 then mark LEFT border
-                or  r8, LEFT ; modifies flags
+                or  r8b, LEFT ; modifies flags
                 cmp cl, 0
             .not_last_x
             jge    .for_x
 
-        and r8, ~BOTTOM
+        and r8b, ~BOTTOM
 
         dec dl
         cmp dl, 0
         jnz .not_last_y ; if 0 then mark TOP border
-            or   r8, TOP ; modifies flags
+            or   r8b, TOP ; modifies flags
             cmp dl, 0
         .not_last_y
         jge    .for_y
@@ -271,11 +258,11 @@ print_matrix:
             mov    rbx, BOARD_SIZE
             mul    rbx ;rax *= BOARD_SIZE
             add    rax, rdi
-            mov    al, BYTE[matrix + rax] ; could swap for lea            
+            mov    al, BYTE[matrix + rax] ; could swap for lea   
 
-            cmp    sil, [cursor_pos + Pos.y]                                    ; if its the cursor pos.y
+            cmp    sil, BYTE[cursor_pos + Pos.y]                                    ; if its the cursor pos.y
             jnz _not_cursor
-            cmp    dil, [cursor_pos + Pos.x]                                    ; if its the cursor pos.x
+            cmp    dil, BYTE[cursor_pos + Pos.x]                                    ; if its the cursor pos.x
             jnz _not_cursor
                 %define START_H  0x31335b1b
                 %define START_H2 0x6d ; len 5
@@ -322,8 +309,7 @@ print_matrix:
             cmp     r15, 1
             jnz __not_cursor
                 %define END_H 0x6d305b1b ; len 4
-                mov     DWORD[print_buffer + r8], END_H ;ESC | '[0'<<8 
-                ;mov     BYTE[print_buffer + r8 + 4], "m"
+                mov     DWORD[print_buffer + r8], END_H 
                 add     r8, 4
                 xor    r15, r15
             __not_cursor:
@@ -367,12 +353,12 @@ game_win:
 
 %macro jump_if_pos_invalid 1
     cmp cl, BOARD_SIZE
-    je  %1
+    jg  %1
     cmp cl, 0
     jl  %1
 
     cmp dl, BOARD_SIZE
-    je  %1
+    jg  %1
     cmp dl, 0
     jl  %1
 %endmacro
@@ -383,12 +369,12 @@ game_win:
 ; rax return
 is_pos_valid:
     cmp cl, BOARD_SIZE
-    je  is_pos_valid.invalid
+    jg  is_pos_valid.invalid
     cmp cl, 0
     jl  is_pos_valid.invalid
 
     cmp dl, BOARD_SIZE
-    je  is_pos_valid.invalid
+    jg  is_pos_valid.invalid
     cmp dl, 0
     jl  is_pos_valid.invalid
 
@@ -402,7 +388,7 @@ ret
 ; reveal tile on:
 ; cl for x
 ; dl for y
-; r8 for auto: 1 for auto
+; r8b for auto: 1 for auto
 reveal:
     push rax
     push rbx
@@ -427,7 +413,7 @@ reveal:
 
     test    bl, BOMB ; if BOMB
     jz     reveal.not_bomb
-        test   r8, r8                ; if clicked <=> r8 = 0
+        test   r8b, r8b                ; if clicked <=> r8b = 0
         jnz    .nothing              ; if auto and bomb then dont reveal other
             or    byte[matrix + rax], REVEALED
             and   byte[matrix + rax], ~FLAGGED
@@ -451,7 +437,7 @@ reveal:
     jnz     reveal.nothing
 
     ; reveal all neighbors
-    mov r8, 1 ; as auto
+    mov r8b, 1 ; as auto
     
     ; north
     dec dl   
@@ -495,21 +481,8 @@ ret
 
 
 _start:
-
-    ; call sys_read
-    ; mov     rax, [input_buffer]
-    ; print input_buffer, 1
-    ; call print_endl
     
     call generate_board
-    
-    
-    
-    ; mov  cl, 1
-    ; mov  dl, 0
-    ; xor  r8, r8
-    ; call reveal
-
 
     _game_loop:
         call print_matrix
@@ -551,9 +524,10 @@ _start:
                 mov  rax,   [revealed_counter]
                 add  rax,   [bomb_count]
                 cmp  rax,   BOARD_SIZE*BOARD_SIZE
-                jne input.end
+                jne .end
                     call game_win
-                jmp input.end
+
+                jmp .end
             .e:
             cmp     rax, 'f'
             jnz input.f
@@ -616,22 +590,17 @@ matrix: times BOARD_SIZE*BOARD_SIZE db 00100000b
 game_over_text db ENDL_CHAR,"Game over, you encounter a mine!", ENDL_CHAR
 game_over_len equ $-game_over_text
 
-game_win_text db ENDL_CHAR,"YOU WON! Congratulations and have a great day", ENDL_CHAR
+game_win_text db ENDL_CHAR, "YOU WON! Congratulations and have a great day", ENDL_CHAR
 game_win_len equ $-game_win_text
 
-debug_text db ENDL_CHAR,"THIS IS A DEBUG MESSEGE", ENDL_CHAR
+debug_text db ENDL_CHAR,    "THIS IS A DEBUG MESSEGE", ENDL_CHAR
 debug_text_len equ $-debug_text
 
 section .bss
-input_buffer: resb 1
-
-
-print_buffer: resb (BOARD_SIZE+1)*BOARD_SIZE + 10
-print_buffer_len: equ $print_buffer
-; print_index: resq 1
-
 cursor_pos: resb 2
-; cursor_blink: resb 1
 
 bomb_count: resq 1
 revealed_counter: resq 1
+
+print_buffer: resb (BOARD_SIZE+1)*BOARD_SIZE + 10 ; +1 for enters
+print_buffer_len: equ $-print_buffer
