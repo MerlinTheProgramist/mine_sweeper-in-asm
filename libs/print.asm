@@ -5,6 +5,7 @@
 
 global print_num
 global print_endl
+global print_char
 
 section .text
 
@@ -80,6 +81,29 @@ print_num:
 	pop rbx
 	pop rax
 ret
+
+; char directly to rax
+print_char:
+	push rbx
+	push rdx
+	push rsi
+	push rdi
+	push rax
+	
+	lea rsi, QWORD[rsp]
+
+	mov 	rax, 1  ; sys_write
+	mov     rdi, 1	; std_out
+	mov 	rdx, 1	; size
+	syscall
+
+	pop rax
+	pop rdi
+	pop rsi
+	pop rdx
+	pop rbx
+ret
+
 
 print_endl:
 	print endl, 1
